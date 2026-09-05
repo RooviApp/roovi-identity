@@ -1,0 +1,6 @@
+@RooviApp.Identity.Api_HostAddress = http://localhost:5104
+
+GET {{RooviApp.Identity.Api_HostAddress}}/health
+Accept: application/json
+
+###

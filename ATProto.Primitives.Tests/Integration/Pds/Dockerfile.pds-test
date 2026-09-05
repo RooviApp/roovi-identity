@@ -1,0 +1,19 @@
+# Test-friendly PDS Dockerfile
+# Based on the official PDS image but configured for testing scenarios
+FROM ghcr.io/bluesky-social/pds:0.4
+
+# Install tools needed for testing
+RUN apk add --no-cache curl wget
+
+# Create data directory
+RUN mkdir -p /pds/blocks
+
+# The PDS will be configured via environment variables passed from Testcontainers
+# No need to copy config files - everything is set at runtime
+
+# Expose the PDS port
+EXPOSE 3000
+
+# Health check to ensure the service is ready
+HEALTHCHECK --interval=5s --timeout=3s --retries=10 \
+    CMD wget --quiet --tries=1 --spider http://localhost:3000/xrpc/_health || exit 1
