@@ -4,7 +4,8 @@ namespace ATProto.Tests.Integration.Pds;
 /// Tests for basic PDS container functionality including health checks,
 /// account creation, and administrative operations.
 /// </summary>
-public class PdsContainerTests(PdsTestContainer pds) : IClassFixture<PdsTestContainer>
+[Collection("PDS")]
+public class PdsContainerTests(PdsTestContainer pds)
 {
     private readonly PdsTestContainer _pds = pds;
     private readonly HttpClient _httpClient = new();
@@ -16,13 +17,13 @@ public class PdsContainerTests(PdsTestContainer pds) : IClassFixture<PdsTestCont
         var healthUrl = $"{_pds.PdsUrl}/xrpc/_health";
 
         // Act
-        var response = await _httpClient.GetAsync(healthUrl);
+        var response = await _httpClient.GetAsync(healthUrl, TestContext.Current.CancellationToken);
 
         // Assert
         Assert.True(response.IsSuccessStatusCode,
             $"Health check failed. URL: {healthUrl}");
 
-        var content = await response.Content.ReadAsStringAsync();
+        var content = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
         Assert.Contains("version", content);
     }
 
@@ -30,12 +31,12 @@ public class PdsContainerTests(PdsTestContainer pds) : IClassFixture<PdsTestCont
     public async Task CreateAccount_ShouldSucceed()
     {
         // Arrange
-        var handle = $"testuser{Guid.NewGuid():N}.test";
-        var email = $"test{Guid.NewGuid():N}@example.com";
+        var handle = $"testuser{Guid.NewGuid().ToString("N")[..8]}.test";
+        var email = $"test{Guid.NewGuid().ToString("N")[..8]}@example.com";
         var password = "TestPassword123!";
 
         // Act
-        var did = await _pds.CreateAccountAsync(handle, email, password);
+        var did = await _pds.CreateAccountAsync(handle, email, password, TestContext.Current.CancellationToken);
 
         // Assert
         Assert.NotNull(did);
@@ -46,7 +47,7 @@ public class PdsContainerTests(PdsTestContainer pds) : IClassFixture<PdsTestCont
     public async Task CreateInviteCode_ShouldReturnValidCode()
     {
         // Act
-        var inviteCode = await _pds.CreateInviteCodeAsync();
+        var inviteCode = await _pds.CreateInviteCodeAsync(TestContext.Current.CancellationToken);
 
         // Assert
         Assert.NotNull(inviteCode);
@@ -62,9 +63,9 @@ public class PdsContainerTests(PdsTestContainer pds) : IClassFixture<PdsTestCont
         // Act - Create 3 accounts
         for (int i = 0; i < 3; i++)
         {
-            var handle = $"user{i}-{Guid.NewGuid():N}.test";
-            var email = $"user{i}-{Guid.NewGuid():N}@example.com";
-            var did = await _pds.CreateAccountAsync(handle, email, "password123");
+            var handle = $"user{i}-{Guid.NewGuid().ToString("N")[..8]}.test";
+            var email = $"user{i}-{Guid.NewGuid().ToString("N")[..8]}@example.com";
+            var did = await _pds.CreateAccountAsync(handle, email, "password123", TestContext.Current.CancellationToken);
             accounts.Add(did);
         }
 
