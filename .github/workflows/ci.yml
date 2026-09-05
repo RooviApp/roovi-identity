@@ -3,27 +3,35 @@ name: Build and test
 on:
   push:
   pull_request:
+  merge_group:
   workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  unit-tests:
+  all-tests:
+    name: All tests
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
-          dotnet-version: |
-            8.0.x
-            10.0.x
+          dotnet-version: 10.0.x
+      - name: Verify Docker
+        run: docker info
       - run: dotnet restore RooviApp.Identity.sln
       - run: dotnet build RooviApp.Identity.sln --configuration Release --no-restore
-      - run: dotnet test ATProto.Primitives.Tests/ATProto.Tests.csproj --configuration Release --no-build --filter "FullyQualifiedName!~Integration" --logger "trx;LogFileName=unit-tests.trx" --results-directory TestResults
-      - uses: actions/upload-artifact@v4
+      - name: Run every test
+        run: >-
+          dotnet test --solution RooviApp.Identity.sln --configuration Release --no-build
+          --fail-skips on --minimum-expected-tests 185 --timeout 5m
+          --report-trx --report-trx-filename all-tests.trx --results-directory TestResults
+          --coverlet --coverlet-output-format cobertura
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
-          name: unit-test-results
-          path: TestResults/*.trx
+          name: test-results
+          path: TestResults/
+          if-no-files-found: error

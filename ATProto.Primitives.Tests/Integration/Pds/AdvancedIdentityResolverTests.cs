@@ -7,7 +7,8 @@ namespace ATProto.Tests.Integration.Pds;
 /// Advanced integration tests demonstrating how to use the PDS test container
 /// with your actual IdentityResolver, HandleResolver, and DIDResolver implementations.
 /// </summary>
-public class AdvancedIdentityResolverTests : IClassFixture<PdsTestContainer>
+[Collection("PDS")]
+public class AdvancedIdentityResolverTests
 {
     private readonly PdsTestContainer _pds;
     private readonly HttpClient _httpClient;
@@ -26,11 +27,11 @@ public class AdvancedIdentityResolverTests : IClassFixture<PdsTestContainer>
     public async Task IdentityResolver_WithTestPdsAccount_ResolvesCompleteIdentity()
     {
         // Arrange: Create a test account on the PDS
-        var handle = $"alice-{Guid.NewGuid():N}.test";
-        var email = $"alice-{Guid.NewGuid():N}@example.com";
+        var handle = $"alice-{Guid.NewGuid().ToString("N")[..8]}.test";
+        var email = $"alice-{Guid.NewGuid().ToString("N")[..8]}@example.com";
         var password = "SecurePassword123!";
 
-        var createdDid = await _pds.CreateAccountAsync(handle, email, password);
+        var createdDid = await _pds.CreateAccountAsync(handle, email, password, TestContext.Current.CancellationToken);
 
         // Create identity resolver components pointing to our test PDS
         var handleResolver = new HandleResolver(_httpClient, new Uri(_pds.PdsUrl));
@@ -41,9 +42,9 @@ public class AdvancedIdentityResolverTests : IClassFixture<PdsTestContainer>
         var result = await identityResolver.GetDIDDocument(
             input: handle,
             noCache: true,
-            plcDirectoryUrl: "https://plc.directory/",
+            plcDirectoryUrl: _pds.PlcUrl,
             allowHttp: true, // IMPORTANT: Test PDS uses HTTP
-            ct: CancellationToken.None);
+            ct: TestContext.Current.CancellationToken);
 
         // Assert: Verify all identity components
         Assert.NotNull(result);
@@ -54,18 +55,15 @@ public class AdvancedIdentityResolverTests : IClassFixture<PdsTestContainer>
         Assert.Equal(createdDid, result.DID.ToString());
 
         // The PDS endpoint should point to our test instance
-        Assert.Contains(_pds.PdsUrl.TrimEnd('/'), result.Pds.AbsoluteUri);
+        Assert.Contains(_pds.ServiceUrl.TrimEnd('/'), result.Pds.AbsoluteUri);
     }
 
     [Fact]
     public async Task HandleResolver_WithTestAccount_ResolvesDID()
     {
         // Arrange
-        var handle = $"bob-{Guid.NewGuid():N}.test";
-        var createdDid = await _pds.CreateAccountAsync(
-            handle,
-            $"bob-{Guid.NewGuid():N}@example.com",
-            "password123");
+        var handle = $"bob-{Guid.NewGuid().ToString("N")[..8]}.test";
+        var createdDid = await _pds.CreateAccountAsync(handle, $"bob-{Guid.NewGuid().ToString("N")[..8]}@example.com", "password123", TestContext.Current.CancellationToken);
 
         var handleResolver = new HandleResolver(_httpClient, new Uri(_pds.PdsUrl));
         var handleObj = Handle.Create(handle);
@@ -74,7 +72,7 @@ public class AdvancedIdentityResolverTests : IClassFixture<PdsTestContainer>
         var resolvedDid = await handleResolver.ResolveAsync(
             handleObj,
             noCache: true,
-            CancellationToken.None);
+            TestContext.Current.CancellationToken);
 
         // Assert
         Assert.NotNull(resolvedDid);
@@ -85,11 +83,8 @@ public class AdvancedIdentityResolverTests : IClassFixture<PdsTestContainer>
     public async Task DIDResolver_WithTestAccount_ResolvesDIDDocument()
     {
         // Arrange: Create account and get DID
-        var handle = $"carol-{Guid.NewGuid():N}.test";
-        var createdDid = await _pds.CreateAccountAsync(
-            handle,
-            $"carol-{Guid.NewGuid():N}@example.com",
-            "password123");
+        var handle = $"carol-{Guid.NewGuid().ToString("N")[..8]}.test";
+        var createdDid = await _pds.CreateAccountAsync(handle, $"carol-{Guid.NewGuid().ToString("N")[..8]}@example.com", "password123", TestContext.Current.CancellationToken);
 
         var didObj = DID.Create(createdDid);
         var didResolver = new DIDResolver(_httpClient);
@@ -98,9 +93,9 @@ public class AdvancedIdentityResolverTests : IClassFixture<PdsTestContainer>
         var document = await didResolver.ResolveAsync(
             didObj,
             noCache: true,
-            plcDirectoryUrl: "https://plc.directory/",
+            plcDirectoryUrl: _pds.PlcUrl,
             allowHttp: true, // Allow HTTP for test PDS
-            CancellationToken.None);
+            TestContext.Current.CancellationToken);
 
         // Assert: Verify DID document structure
         Assert.NotNull(document);
@@ -115,18 +110,15 @@ public class AdvancedIdentityResolverTests : IClassFixture<PdsTestContainer>
 
         // The service endpoint should reference our test PDS
         Assert.Equal(DIDServiceEndpoint.EndpointType.Uri, pdsService.ServiceEndpoint.Type);
-        Assert.Contains(_pds.PdsUrl, pdsService.ServiceEndpoint.Uri);
+        Assert.Contains(_pds.ServiceUrl, pdsService.ServiceEndpoint.Uri);
     }
 
     [Fact]
     public async Task IdentityResolver_WithDIDInput_ResolvesDirectly()
     {
         // Arrange: Create account
-        var handle = $"dave-{Guid.NewGuid():N}.test";
-        var createdDid = await _pds.CreateAccountAsync(
-            handle,
-            $"dave-{Guid.NewGuid():N}@example.com",
-            "password123");
+        var handle = $"dave-{Guid.NewGuid().ToString("N")[..8]}.test";
+        var createdDid = await _pds.CreateAccountAsync(handle, $"dave-{Guid.NewGuid().ToString("N")[..8]}@example.com", "password123", TestContext.Current.CancellationToken);
 
         var handleResolver = new HandleResolver(_httpClient, new Uri(_pds.PdsUrl));
         var didResolver = new DIDResolver(_httpClient);
@@ -136,9 +128,9 @@ public class AdvancedIdentityResolverTests : IClassFixture<PdsTestContainer>
         var result = await identityResolver.GetDIDDocument(
             input: createdDid, // Pass DID directly
             noCache: true,
-            plcDirectoryUrl: "https://plc.directory/",
+            plcDirectoryUrl: _pds.PlcUrl,
             allowHttp: true,
-            ct: CancellationToken.None);
+            ct: TestContext.Current.CancellationToken);
 
         // Assert
         Assert.NotNull(result);
@@ -154,11 +146,8 @@ public class AdvancedIdentityResolverTests : IClassFixture<PdsTestContainer>
 
         for (int i = 0; i < 3; i++)
         {
-            var handle = $"user{i}-{Guid.NewGuid():N}.test";
-            var did = await _pds.CreateAccountAsync(
-                handle,
-                $"user{i}-{Guid.NewGuid():N}@example.com",
-                "password123");
+            var handle = $"user{i}-{Guid.NewGuid().ToString("N")[..8]}.test";
+            var did = await _pds.CreateAccountAsync(handle, $"user{i}-{Guid.NewGuid().ToString("N")[..8]}@example.com", "password123", TestContext.Current.CancellationToken);
 
             accounts.Add((handle, did));
         }
@@ -172,7 +161,7 @@ public class AdvancedIdentityResolverTests : IClassFixture<PdsTestContainer>
             var resolvedDid = await handleResolver.ResolveAsync(
                 handleObj,
                 noCache: true,
-                CancellationToken.None);
+                TestContext.Current.CancellationToken);
 
             Assert.NotNull(resolvedDid);
             Assert.Equal(expectedDid, resolvedDid.ToString());
@@ -195,9 +184,9 @@ public class AdvancedIdentityResolverTests : IClassFixture<PdsTestContainer>
             await identityResolver.GetDIDDocument(
                 input: nonExistentHandle,
                 noCache: true,
-                plcDirectoryUrl: "https://plc.directory/",
+                plcDirectoryUrl: _pds.PlcUrl,
                 allowHttp: true,
-                ct: CancellationToken.None);
+                ct: TestContext.Current.CancellationToken);
         });
     }
 
@@ -209,11 +198,8 @@ public class AdvancedIdentityResolverTests : IClassFixture<PdsTestContainer>
         // using the default bsky.social
 
         // Arrange: Create account
-        var handle = $"custom-{Guid.NewGuid():N}.test";
-        var expectedDid = await _pds.CreateAccountAsync(
-            handle,
-            $"custom-{Guid.NewGuid():N}@example.com",
-            "password123");
+        var handle = $"custom-{Guid.NewGuid().ToString("N")[..8]}.test";
+        var expectedDid = await _pds.CreateAccountAsync(handle, $"custom-{Guid.NewGuid().ToString("N")[..8]}@example.com", "password123", TestContext.Current.CancellationToken);
 
         // Create resolver pointing to our test PDS
         var handleResolver = new HandleResolver(
@@ -224,7 +210,7 @@ public class AdvancedIdentityResolverTests : IClassFixture<PdsTestContainer>
         var resolvedDid = await handleResolver.ResolveAsync(
             Handle.Create(handle),
             noCache: true,
-            CancellationToken.None);
+            TestContext.Current.CancellationToken);
 
         // Assert
         Assert.NotNull(resolvedDid);
@@ -241,16 +227,16 @@ public class AdvancedIdentityResolverTests : IClassFixture<PdsTestContainer>
         // 4. Extract the PDS endpoint from the document
 
         // Step 1: Create account
-        var handle = $"endtoend-{Guid.NewGuid():N}.test";
-        var email = $"endtoend-{Guid.NewGuid():N}@example.com";
+        var handle = $"endtoend-{Guid.NewGuid().ToString("N")[..8]}.test";
+        var email = $"endtoend-{Guid.NewGuid().ToString("N")[..8]}@example.com";
         var password = "TestPassword123!";
 
-        var createdDid = await _pds.CreateAccountAsync(handle, email, password);
+        var createdDid = await _pds.CreateAccountAsync(handle, email, password, TestContext.Current.CancellationToken);
 
         // Step 2: Resolve handle to DID
         var handleResolver = new HandleResolver(_httpClient, new Uri(_pds.PdsUrl));
         var handleObj = Handle.Create(handle);
-        var resolvedDid = await handleResolver.ResolveAsync(handleObj, true, CancellationToken.None);
+        var resolvedDid = await handleResolver.ResolveAsync(handleObj, true, TestContext.Current.CancellationToken);
 
         Assert.NotNull(resolvedDid);
         Assert.Equal(createdDid, resolvedDid.ToString());
@@ -260,9 +246,9 @@ public class AdvancedIdentityResolverTests : IClassFixture<PdsTestContainer>
         var didDocument = await didResolver.ResolveAsync(
             resolvedDid!,
             noCache: true,
-            plcDirectoryUrl: "https://plc.directory/",
+            plcDirectoryUrl: _pds.PlcUrl,
             allowHttp: true,
-            CancellationToken.None);
+            TestContext.Current.CancellationToken);
 
         Assert.NotNull(didDocument);
         Assert.Equal(createdDid, didDocument.Id?.ToString());
@@ -275,6 +261,6 @@ public class AdvancedIdentityResolverTests : IClassFixture<PdsTestContainer>
         Assert.Equal(DIDServiceEndpoint.EndpointType.Uri, pdsService.ServiceEndpoint.Type);
 
         var pdsEndpoint = pdsService.ServiceEndpoint.Uri;
-        Assert.Contains(_pds.PdsUrl, pdsEndpoint);
+        Assert.Contains(_pds.ServiceUrl, pdsEndpoint);
     }
 }

@@ -7,7 +7,8 @@ namespace ATProto.Tests.Integration.Pds;
 /// Integration tests for HandleResolver functionality using a test PDS instance.
 /// Tests handle-to-DID resolution against a real PDS.
 /// </summary>
-public class HandleResolverTests(PdsTestContainer pds) : IClassFixture<PdsTestContainer>
+[Collection("PDS")]
+public class HandleResolverTests(PdsTestContainer pds)
 {
     private readonly PdsTestContainer _pds = pds;
     private readonly HttpClient _httpClient = new()
@@ -19,11 +20,8 @@ public class HandleResolverTests(PdsTestContainer pds) : IClassFixture<PdsTestCo
     public async Task ResolveAsync_WithValidHandle_ResolvesToDID()
     {
         // Arrange
-        var handle = $"alice{Guid.NewGuid():N}.test";
-        var createdDid = await _pds.CreateAccountAsync(
-            handle,
-            $"alice{Guid.NewGuid():N}@example.com",
-            "password123");
+        var handle = $"alice{Guid.NewGuid().ToString("N")[..8]}.test";
+        var createdDid = await _pds.CreateAccountAsync(handle, $"alice{Guid.NewGuid().ToString("N")[..8]}@example.com", "password123", TestContext.Current.CancellationToken);
 
         var handleResolver = new HandleResolver(_httpClient, new Uri(_pds.PdsUrl));
         var handleObj = Handle.Create(handle);
@@ -32,7 +30,7 @@ public class HandleResolverTests(PdsTestContainer pds) : IClassFixture<PdsTestCo
         var resolvedDid = await handleResolver.ResolveAsync(
             handleObj,
             noCache: true,
-            CancellationToken.None);
+            TestContext.Current.CancellationToken);
 
         // Assert
         Assert.NotNull(resolvedDid);
@@ -47,11 +45,8 @@ public class HandleResolverTests(PdsTestContainer pds) : IClassFixture<PdsTestCo
 
         for (int i = 0; i < 3; i++)
         {
-            var handle = $"user{i}-{Guid.NewGuid():N}.test";
-            var did = await _pds.CreateAccountAsync(
-                handle,
-                $"user{i}-{Guid.NewGuid():N}@example.com",
-                "password123");
+            var handle = $"user{i}-{Guid.NewGuid().ToString("N")[..8]}.test";
+            var did = await _pds.CreateAccountAsync(handle, $"user{i}-{Guid.NewGuid().ToString("N")[..8]}@example.com", "password123", TestContext.Current.CancellationToken);
 
             accounts.Add((handle, did));
         }
@@ -65,7 +60,7 @@ public class HandleResolverTests(PdsTestContainer pds) : IClassFixture<PdsTestCo
             var resolvedDid = await handleResolver.ResolveAsync(
                 handleObj,
                 noCache: true,
-                CancellationToken.None);
+                TestContext.Current.CancellationToken);
 
             Assert.NotNull(resolvedDid);
             Assert.Equal(expectedDid, resolvedDid.ToString());
@@ -80,11 +75,8 @@ public class HandleResolverTests(PdsTestContainer pds) : IClassFixture<PdsTestCo
         // using the default bsky.social
 
         // Arrange: Create account
-        var handle = $"custom-{Guid.NewGuid():N}.test";
-        var expectedDid = await _pds.CreateAccountAsync(
-            handle,
-            $"custom-{Guid.NewGuid():N}@example.com",
-            "password123");
+        var handle = $"custom-{Guid.NewGuid().ToString("N")[..8]}.test";
+        var expectedDid = await _pds.CreateAccountAsync(handle, $"custom-{Guid.NewGuid().ToString("N")[..8]}@example.com", "password123", TestContext.Current.CancellationToken);
 
         // Create resolver pointing to our test PDS
         var handleResolver = new HandleResolver(
@@ -95,7 +87,7 @@ public class HandleResolverTests(PdsTestContainer pds) : IClassFixture<PdsTestCo
         var resolvedDid = await handleResolver.ResolveAsync(
             Handle.Create(handle),
             noCache: true,
-            CancellationToken.None);
+            TestContext.Current.CancellationToken);
 
         // Assert
         Assert.NotNull(resolvedDid);
@@ -113,7 +105,7 @@ public class HandleResolverTests(PdsTestContainer pds) : IClassFixture<PdsTestCo
         var result = await handleResolver.ResolveAsync(
             nonExistentHandle,
             noCache: true,
-            CancellationToken.None);
+            TestContext.Current.CancellationToken);
 
         // Assert
         Assert.Null(result);

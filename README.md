@@ -2,28 +2,28 @@
 
 The planned identity service for **Roovi**, an AT Protocol driven video app inspired by TikTok and YouTube Reels. This repository contains identity primitives and the service foundation; video feeds, uploads, and playback belong to the wider application.
 
-**Status: early development.** The library implements DID and handle validation, handle resolution through XRPC, DID document retrieval, and PDS discovery. The API and OAuth flow are scaffolding, not a working authentication service. Passing unit tests do not establish full protocol conformance or production readiness.
+**Status: early development.** The library implements DID and handle validation, handle resolution through XRPC, DID document retrieval, and PDS discovery. The API and OAuth flow are scaffolding, not a working authentication service. Passing tests do not establish full protocol conformance or production readiness.
 
 ## Repository layout
 
-| Project | Current responsibility |
+| Project | Responsibility |
 | --- | --- |
 | `ATProto.Primitives` | Identity types, JSON conversion, resolvers, PDS discovery, unfinished OAuth primitives |
-| `ATProto.Primitives.Tests` | xUnit unit tests and external integration tests |
+| `ATProto.Primitives.Tests` | Unit tests, API smoke test, real PDS integration tests |
 | `RooviApp.Identity.Api` | ASP.NET Core API scaffold with development Swagger |
-| `RooviApp.Identity.AppHost` | Aspire 9.0 host for the API |
+| `RooviApp.Identity.AppHost` | Aspire 13.5 host for the API |
 | `RooviApp.Identity.ServiceDefaults` | Health checks, service discovery, resilience, telemetry |
 
 ## Getting started
 
-Prerequisites: .NET 10 SDK and .NET 8 / ASP.NET Core 8 runtimes (projects target `net8.0`). CI installs both SDKs. Docker with Linux containers is additionally required for PDS integration tests. `NuGet.Config` uses only nuget.org; private package feeds are not required.
+Install the **.NET 10 SDK** and Docker with Linux containers. `global.json` selects a stable .NET 10 SDK and Microsoft.Testing.Platform. `NuGet.Config` uses only nuget.org. The tests pull a pinned official PDS image; no public AT Protocol account or credentials are required.
 
 ```sh
 git clone https://github.com/RooviApp/roovi-identity.git
 cd roovi-identity
 dotnet restore RooviApp.Identity.sln
 dotnet build RooviApp.Identity.sln --configuration Release
-dotnet test ATProto.Primitives.Tests/ATProto.Tests.csproj --configuration Release --no-build --filter "FullyQualifiedName!~Integration"
+dotnet test --solution RooviApp.Identity.sln --configuration Release --no-build
 ```
 
 Run the API directly:
@@ -32,32 +32,40 @@ Run the API directly:
 dotnet run --project RooviApp.Identity.Api --launch-profile http
 ```
 
-Open [Swagger](http://localhost:5104/swagger). The existing `POST /api/Authentication/login?username=...` endpoint is a placeholder returning an empty 200 response; it does not authenticate anyone or issue tokens. No identity-resolution HTTP endpoint is wired yet. The AppHost is available for Aspire-enabled development environments.
+Open [Swagger](http://localhost:5104/swagger). `POST /api/Authentication/login?username=...` remains a placeholder returning an empty 200 response; it does not authenticate or issue tokens. No identity-resolution HTTP endpoint is wired yet. The AppHost is available for Aspire-enabled environments.
 
-## Tests
+## Tests and PR gate
 
-GitHub Actions builds the whole solution and runs deterministic unit tests on pushes and pull requests, uploading TRX results. Unit namespaces are not uniform, so the filter excludes `Integration` rather than assuming a `Unit` namespace.
+GitHub Actions builds every project and runs **all tests** on pushes, pull requests, and merge-queue events. The required check is named **All tests**. There is no integration-test exclusion or continue-on-error setting. The command rejects skipped tests and runs with a five-minute test timeout; the job timeout is fifteen minutes. TRX results and Cobertura coverage are uploaded even on failure.
 
-Live identity smoke test (requires public network access and a hard-coded public account):
-
-```sh
-dotnet test ATProto.Primitives.Tests/ATProto.Tests.csproj --configuration Release --filter "FullyQualifiedName~Integration.Identity"
-```
-
-Experimental PDS tests (Docker and network required):
+Run the same check locally:
 
 ```sh
-dotnet test ATProto.Primitives.Tests/ATProto.Tests.csproj --configuration Release --filter "FullyQualifiedName~Integration.Pds"
+dotnet test --solution RooviApp.Identity.sln --configuration Release --no-build --fail-skips on --minimum-expected-tests 185 --timeout 5m --report-trx --report-trx-filename all-tests.trx --results-directory TestResults --coverlet --coverlet-output-format cobertura
 ```
 
-An unfiltered `dotnet test` includes external tests. PDS tests are excluded from the default CI gate: the fixture currently fails container startup, assumes `pdsadmin` exists inside the image, and uses the public PLC directory for account creation/resolution. It needs repair and isolation before it can serve as a reliable CI gate. See [integration notes](ATProto.Primitives.Tests/Integration/README.md).
+The 185-test minimum catches accidental loss of test discovery. Update it deliberately when reorganizing/removing tests; adding tests does not require changing it.
+
+For a quick unit-only development run without Docker:
+
+```sh
+dotnet test --project ATProto.Primitives.Tests/ATProto.Tests.csproj --filter-not-namespace "ATProto.Tests.Integration*"
+```
+
+Integration tests create temporary accounts on a real PDS and resolve them through a local PLC test double. The double validates genesis signatures and DID hashes with the reference PLC library, but does not implement the full PLC operation history/recovery protocol. It never writes to the public PLC directory. See [integration notes](ATProto.Primitives.Tests/Integration/README.md).
+
+Direct NuGet dependencies and GitHub Actions use current stable releases. Transitive dependencies follow the versions selected by their upstream packages. Dependabot checks NuGet and Actions weekly. To audit:
+
+```sh
+dotnet list RooviApp.Identity.sln package --outdated
+dotnet list RooviApp.Identity.sln package --vulnerable --include-transitive
+```
 
 ## Next milestones
 
 - Wire resolver dependencies and expose a defined identity-resolution API; `AddATProto` currently leaves HTTP client and handle resolver setup to callers.
 - Complete OAuth discovery, authorization, callback validation, and session handling; replace the login placeholder.
 - Harden resolution: exact handle back-reference checks, matching requested/returned DIDs, absolute PDS service IDs, URL handling, request limits, and SSRF protections.
-- Add deterministic resolver/API tests, then repair and isolate the PDS fixture from the public PLC directory.
 - Define the boundary between Roovi sessions and AT Protocol credentials before integrating the video app.
 
 ## License and protocol references

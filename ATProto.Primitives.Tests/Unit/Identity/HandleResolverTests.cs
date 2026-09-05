@@ -40,7 +40,7 @@ public class HandleResolverTests
         var httpClient = new HttpClient(handler);
         var resolver = new HandleResolver(httpClient, _serviceUri);
 
-        var result = await resolver.ResolveAsync(handle, noCache: false);
+        var result = await resolver.ResolveAsync(handle, noCache: false, ct: TestContext.Current.CancellationToken);
 
         Assert.NotNull(result);
         Assert.Equal(expectedDid, result.Value);
@@ -67,7 +67,7 @@ public class HandleResolverTests
         var httpClient = new HttpClient(handler);
         var resolver = new HandleResolver(httpClient, _serviceUri);
 
-        var result = await resolver.ResolveAsync(handle, noCache: false);
+        var result = await resolver.ResolveAsync(handle, noCache: false, ct: TestContext.Current.CancellationToken);
 
         Assert.Null(result);
     }
@@ -88,8 +88,7 @@ public class HandleResolverTests
 
         // Act & Assert
         await Assert.ThrowsAsync<Exception>(
-            () => resolver.ResolveAsync(handle, noCache: false)
-        );
+            () => resolver.ResolveAsync(handle, noCache: false, ct: TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -115,7 +114,7 @@ public class HandleResolverTests
         var resolver = new HandleResolver(httpClient, _serviceUri);
 
         // Act
-        await resolver.ResolveAsync(handle, noCache: true);
+        await resolver.ResolveAsync(handle, noCache: true, ct: TestContext.Current.CancellationToken);
 
         // Assert
         Assert.NotNull(capturedRequest);
@@ -164,8 +163,7 @@ public class HandleResolverTests
 
         // Act & Assert
         await Assert.ThrowsAsync<JsonException>(
-            () => resolver.ResolveAsync(handle, noCache: false)
-        );
+            () => resolver.ResolveAsync(handle, noCache: false, ct: TestContext.Current.CancellationToken));
     }
 
     [Theory]
@@ -189,7 +187,7 @@ public class HandleResolverTests
         var resolver = new HandleResolver(httpClient, _serviceUri);
 
         // Act
-        var result = await resolver.ResolveAsync(handle, noCache: false);
+        var result = await resolver.ResolveAsync(handle, noCache: false, ct: TestContext.Current.CancellationToken);
 
         // Assert
         Assert.Null(result);
